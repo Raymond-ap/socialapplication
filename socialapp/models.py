@@ -5,6 +5,9 @@ from django.db.models.signals import post_save
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager, BaseUserManager
 import datetime
 from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.core.exceptions import ValidationError
 
 
 class UserManager(BaseUserManager):
@@ -106,7 +109,7 @@ class Post(models.Model):
     post_text = models.TextField(blank=True)
     post_image_url = models.CharField(max_length=200, blank=True)
     post_video_url = models.CharField(max_length=200, blank=True)
-    interraction_count = models.IntegerField(default=0, blank=True)
+    interaction_count = models.IntegerField(default=0, blank=True)
     audience_type = models.CharField(
         max_length=10,
         choices=AUDIENCE_CHOICES,
@@ -136,6 +139,25 @@ class PostInteractionType(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'user'], condition=models.Q(
+                interaction_type='like'), name='unique_like_interaction')
+        ]
+
+    def validate_unique(self, exclude=None):
+        if self.interaction_type == 'like':
+            queryset = PostInteractionType.objects.filter(
+                post=self.post, user=self.user, interaction_type='like'
+            )
+            if self.pk:
+                queryset = queryset.exclude(pk=self.pk)
+            if queryset.exists():
+                raise ValidationError(
+                    {'interaction_type': 'A user can only like a post once.'}
+                )
+        super().validate_unique(exclude)
+
     def __str__(self):
         return self.get_interaction_type_display()
 
@@ -157,11 +179,23 @@ class Like(models.Model):
 
 class Follow(models.Model):
     follower = models.ForeignKey(
-        User, related_name='followers', on_delete=models.CASCADE)
+        User, related_name='following_set', on_delete=models.CASCADE)
     following = models.ForeignKey(
-        User, related_name='following', on_delete=models.CASCADE)
+        User, related_name='followers_set', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.follower} -> {self.following}"
+
+    def validate_unique(self, exclude=None):
+        if self.follower.following_set.filter(id=self.following.id).exists():
+            # If the follower already follows the user, unfollow and raise a ValidationError
+            self.follower.following_set.remove(self.following)
+            raise ValidationError(
+                {'follower': 'You already follow this user. You have been unfollowed.'}
+            )
+        super().validate_unique(exclude)
 
 
 class Group(models.Model):
