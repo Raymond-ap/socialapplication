@@ -8,56 +8,50 @@ from rest_framework import status
 from rest_framework import permissions, generics
 from rest_framework.decorators import api_view, renderer_classes, permission_classes, authentication_classes, throttle_classes
 from django.core.exceptions import ObjectDoesNotExist
-from django.contrib.auth.hashers import check_password, make_password
-from rest_framework_jwt.settings import api_settings
-import jwt
 from .serializers import *
-from django.conf import settings
-
-jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-jwt_encode_handler = api_settings.JWT_ENCODE_HANDLE
-
-
-def get_or_none(classmodel, **kwargs):
-    try:
-        return classmodel.objects.get(**kwargs)
-    except classmodel.DoesNotExist:
-        return None
+from rest_framework.views import APIView
+from .utils import *
+from django.contrib.auth import get_user_model
 
 
-@csrf_exempt
-@api_view(['POST'])
-def Login(request):
 
-    email = request.data['email']
-    password = request.data['password']
+class RegisterView(APIView):
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Custom validation logic
+        email = serializer.validated_data['email']
+        if get_user_model().objects.filter(email=email).exists():
+            return Response({'error': 'User with this email already exist.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = get_or_none(User, email=email)
-        if not user:
-            return Response({'error': 'No account found for this user'}, status=status.HTTP_401_UNAUTHORIZED)
+        # If validation passes, save the user
+        user = serializer.save()
+        
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+    
+    
+
+class LoginView(APIView):
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+
+        user = authenticate(request=self.request, email=email, password=password)
+
+        if user is None:
+            return Response({'error': 'No account found for this user.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         is_active = user.is_active
         if not is_active:
             return Response({'error': 'User account is deactivated'}, status=status.HTTP_401_UNAUTHORIZED)
-        else:
-            if check_password(password, user.password):
-                try:
 
-                    payload = jwt_payload_handler(user)
-                    token = jwt.encode(payload, settings.SECRET_KEY)
-                    serializer = UserSerializer(user)
+        refresh = RefreshToken.for_user(user)
 
-                    resp = {
-                        'token': token,
-                        'user': serializer.data
-                    }
-
-                    return Response(resp, status=status.HTTP_200_OK)
-                except Exception as e:
-                    return Response(str(e), status=status.HTTP_403_FORBIDDEN)
-            else:
-                return Response({'error': 'Wrong email or password'}, status=status.HTTP_401_UNAUTHORIZED)
-    except User.DoesNotExist:
-        return Response({'error': 'Wrong email or password'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response(str(e), status=status.HTTP_403_FORBIDDEN)
+        return Response({
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh)
+        }, status=status.HTTP_200_OK)
