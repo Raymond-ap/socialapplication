@@ -118,8 +118,9 @@ class Follow(models.Model):
 class Group(models.Model):
     group_name = models.CharField(max_length=100)
     group_description = models.TextField(blank=True)
-    group_count = models.IntegerField(default=0, blank=True)
+    group_users_count = models.IntegerField(default=0, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE,null=True,blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
