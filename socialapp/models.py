@@ -1,87 +1,9 @@
 from django.db import models
-from django.contrib.auth.models import User
-
+from authentication.models import User
 from django.db.models.signals import post_save
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager, BaseUserManager
 import datetime
-from django.db import transaction
-from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
-
-
-class UserManager(BaseUserManager):
-
-    def _create_user(self, email, password, **extra_fields):
-        """
-        Creates and saves a User with the given email,and password.
-        """
-        if not email:
-            raise ValueError('The given email must be set')
-        try:
-            with transaction.atomic():
-                user = self.model(email=email, **extra_fields)
-                user.set_password(password)
-                user.save(using=self._db)
-                return user
-        except:
-            raise
-
-    def create_user(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', False)
-        extra_fields.setdefault('is_superuser', False)
-        return self._create_user(email, password, **extra_fields)
-
-    def create_superuser(self, email, password, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        return self._create_user(email, password=password, **extra_fields)
-
-
-class User(AbstractBaseUser, PermissionsMixin):
-    """
-    Custom user realization based on Django AbstractUser and PermissionMixin.
-    """
-    email = models.EmailField(
-        ('email address'),
-        unique=True,
-        blank=True,
-        error_messages={
-            'unique': ("A user with that email already exists."),
-        })
-    username = models.CharField(max_length=20, blank=True)
-    phone = models.CharField(max_length=15, blank=True)
-    firstname = models.CharField(max_length=100, null=True, blank=True)
-    lastname = models.CharField(max_length=100, null=True, blank=True)
-    is_staff = models.BooleanField(
-        ('staff status'),
-        default=False,
-        help_text=('Designates whether the user can log into this admin '
-                   'site.'))
-    is_active = models.BooleanField(
-        ('active'),
-        default=True,
-        help_text=('Designates whether this user should be treated as '
-                   'active. Unselect this instead of deleting accounts.'))
-
-    password = models.TextField(null=True, blank=True)
-    is_firsttime = models.BooleanField(default=True)
-    emailverified = models.BooleanField(default=False)
-    following_count = models.IntegerField(default=0, blank=True, null=True)
-    follower_count = models.IntegerField(default=0, blank=True, null=True)
-    datecreated = models.DateTimeField(auto_now_add=True)
-
-    objects = UserManager()
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
-
-    class Meta:
-        managed = True
-        abstract = False
-        db_table = 'auth_user'
-
-    def _str_(self):
-        return self.email
 
 
 class Tag(models.Model):
@@ -119,13 +41,15 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class PostInteractionType(models.Model):
+class PostInteraction(models.Model):
     LIKE = "like"
     COMMENT = "comment"
+    SHARE="share"
 
     INTERACTION_CHOICES = (
         (LIKE, "Like"),
         (COMMENT, "Comment"),
+        (SHARE,"share")
     )
 
     interaction_type = models.CharField(
@@ -147,7 +71,7 @@ class PostInteractionType(models.Model):
 
     def validate_unique(self, exclude=None):
         if self.interaction_type == 'like':
-            queryset = PostInteractionType.objects.filter(
+            queryset = PostInteraction.objects.filter(
                 post=self.post, user=self.user, interaction_type='like'
             )
             if self.pk:
@@ -188,21 +112,15 @@ class Follow(models.Model):
     def __str__(self):
         return f"{self.follower} -> {self.following}"
 
-    def validate_unique(self, exclude=None):
-        if self.follower.following_set.filter(id=self.following.id).exists():
-            # If the follower already follows the user, unfollow and raise a ValidationError
-            self.follower.following_set.remove(self.following)
-            raise ValidationError(
-                {'follower': 'You already follow this user. You have been unfollowed.'}
-            )
-        super().validate_unique(exclude)
+   
 
 
 class Group(models.Model):
     group_name = models.CharField(max_length=100)
     group_description = models.TextField(blank=True)
-    group_count = models.IntegerField(default=0, blank=True)
+    group_users_count = models.IntegerField(default=0, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE,null=True,blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -227,3 +145,15 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class PostShare(models.Model):
+    shared_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    original_post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='shared_posts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.shared_by} shared {self.original_post}"
+
+    class Meta:
+        unique_together = ('shared_by', 'original_post')
