@@ -43,5 +43,13 @@ urlpatterns = [
     path('shared-posts', get_shared_posts, name='get_shared_posts'),
     path('shared-posts/<int:post_share_id>', delete_shared_post, name='delete_shared_post'),
          
+    path('following-followers-list', list_followers_following, name="following-followers-list"),
+    path('create-group', create_group, name="create_group"),
+    path('group_details', group_details, name="group_details"),
+    path('join-group', join_group, name="join-group"),
+    path('leave-group', leave_group, name="join-leave_group"),
+    path('edit-delete-group/<int:group_id>/', edit_delete_group, name="edit_delete_group"),
+    path('search/', search, name='search'),
+    path('trending-popular-posts/', TrendingAndPopularPostsView.as_view(), name='trending-popular-posts'),
     path('', include(router.urls))
 ]

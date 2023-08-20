@@ -15,6 +15,10 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
+class GroupUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'firstname', 'lastname',)  
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
