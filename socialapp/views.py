@@ -166,7 +166,7 @@ def group_details(request):
 
 
 
-@api_view(['GET'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_group(request):
     payload = request.data
