@@ -27,6 +27,7 @@ def update_follower_following_count(sender, instance, **kwargs):
 @receiver(post_save, sender=PostInteractionType)
 def update_post_interaction(sender, instance, created, **kwargs):
     if created:
+        
         post = instance.post
         interaction_type = instance.interaction_type
 
