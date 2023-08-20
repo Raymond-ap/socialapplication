@@ -16,27 +16,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 
+from rest_framework import viewsets
 
-
-    
-
-
-class FollowView(APIView):
-    def post(self, request):
-        follower_id = request.data.get('follower')
-        following_id = request.data.get('following')
-
-        # Check if the follower already follows the user
-        if Follow.objects.filter(follower_id=follower_id, following_id=following_id).exists():
-            return Response({'error': 'You already follow this user.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        serializer = FollowSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-
+class FollowView(viewsets.ModelViewSet):
+    queryset = Follow.objects.all()
+    serializer_class = FollowSerializer
 
 
 class TagViewSet(viewsets.ModelViewSet):
@@ -57,9 +41,6 @@ class CommentViewSet(viewsets.ModelViewSet):
 class LikeViewSet(viewsets.ModelViewSet):
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
-
-
-
 
 
 class GroupViewSet(viewsets.ModelViewSet):

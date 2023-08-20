@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'socialapp',
     'authentication',
     'rest_framework',
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [

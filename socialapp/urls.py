@@ -1,8 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-
 from .views import *
+
 
 router = DefaultRouter()
 router.register(r'tags', TagViewSet)
@@ -14,9 +14,9 @@ router.register(r'post-interactions', PostInteractionTypeViewSet)
 router.register(r'groups', GroupViewSet)
 router.register(r'group-memberships', GroupMembershipViewSet)
 router.register(r'notifications', NotificationViewSet)
+router.register(r'follows', FollowView)
 
 
 urlpatterns = [
-    path('follows', FollowView.as_view(), name="follows"),
-    path('', include(router.urls))
+    path('', include(router.urls)),
 ]
