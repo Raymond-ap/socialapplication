@@ -17,57 +17,26 @@ from django.contrib.auth.hashers import check_password, make_password
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 
 
-class RegisterView(APIView):
+
+    
+
+
+class FollowView(APIView):
     def post(self, request):
-        payload = request.data
-        hashed_password = make_password(
-            payload['password'])  # Hash the password
+        follower_id = request.data.get('follower')
+        following_id = request.data.get('following')
 
-        # Update the payload with the hashed password
-        payload['password'] = hashed_password
-
-        serializer = UserSerializer(data=payload)
+        # Check if the follower already follows the user
+        if Follow.objects.filter(follower_id=follower_id, following_id=following_id).exists():
+            return Response({'error': 'You already follow this user.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = FollowSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        # Custom validation logic
-        email = serializer.validated_data['email']
-        if get_user_model().objects.filter(email=email).exists():
-            return Response({'error': 'Email already registered.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # If validation passes, save the user
-        user = serializer.save()
-
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class LoginView(APIView):
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data['email']
-        password = serializer.validated_data['password']
-
-        user = authenticate(request=self.request,
-                            email=email, password=password)
-
-        if user is None:
-            return Response({'error': 'No account found for this user.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not user.check_password(password):
-            return Response({'error': 'Invalid password.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        is_active = user.is_active
-        if not is_active:
-            return Response({'error': 'User account is deactivated'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'access_token': str(refresh.access_token),
-            'refresh_token': str(refresh),
-            'user': UserSerializer(user).data
-        }, status=status.HTTP_200_OK)
 
 
 class TagViewSet(viewsets.ModelViewSet):
@@ -76,7 +45,7 @@ class TagViewSet(viewsets.ModelViewSet):
 
 
 class PostInteractionTypeViewSet(viewsets.ModelViewSet):
-    queryset = PostInteractionType.objects.all()
+    queryset = PostInteraction.objects.all()
     serializer_class = PostInteractionTypeSerializer
 
 
@@ -90,9 +59,7 @@ class LikeViewSet(viewsets.ModelViewSet):
     serializer_class = LikeSerializer
 
 
-class FollowViewSet(viewsets.ModelViewSet):
-    queryset = Follow.objects.all()
-    serializer_class = FollowSerializer
+
 
 
 class GroupViewSet(viewsets.ModelViewSet):

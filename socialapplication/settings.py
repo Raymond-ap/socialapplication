@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'socialapp',
+    'authentication',
     'rest_framework',
 ]
 
@@ -54,7 +55,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'socialapplication.urls'
-AUTH_USER_MODEL = "socialapp.User"
+AUTH_USER_MODEL = "authentication.User"
 
 TEMPLATES = [
     {
