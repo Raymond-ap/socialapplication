@@ -22,5 +22,9 @@ urlpatterns = [
     path('create-group', create_group, name="create_group"),
     path('group_details', group_details, name="group_details"),
     path('join-group', join_group, name="join-group"),
+    path('leave-group', leave_group, name="join-leave_group"),
+    path('edit-delete-group/<int:group_id>/', edit_delete_group, name="edit_delete_group"),
+    path('search/', search, name='search'),
+    path('trending-popular-posts/', TrendingAndPopularPostsView.as_view(), name='trending-popular-posts'),
     path('', include(router.urls))
 ]

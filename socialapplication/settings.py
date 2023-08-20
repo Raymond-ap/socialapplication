@@ -136,10 +136,9 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-JWT_AUTH = {
-    'JWT_VERIFY': True,
-    # 'JWT_VERIFY_EXPIRATION': True,
-    # 'JWT_EXPIRATION_DELTA': timedelta(seconds=3600),
-    'JWT_AUTH_HEADER_PREFIX': 'Bearer',
-    # 'JWT_ALLOW_REFRESH': True,
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),  # Set the access token lifetime to 7 days
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=30),  # Set the sliding token refresh lifetime to 30 days
+    # ... other JWT configuration options ...
 }
+

@@ -25,7 +25,7 @@ class FollowAdmin(admin.ModelAdmin):
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
-    list_display = ('group_name', 'group_description', 'created_at')
+    list_display = ('group_name', 'group_description', 'created_at','group_users_count')
 
 @admin.register(GroupMembership)
 class GroupMembershipAdmin(admin.ModelAdmin):

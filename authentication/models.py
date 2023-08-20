@@ -38,6 +38,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom user realization based on Django AbstractUser and PermissionMixin.
     """
+
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+    ACCOUNTTYPE_CHOICES = (
+        (PUBLIC, "public"),
+        (PRIVATE, "private")
+        
+    )
+
     email = models.EmailField(
         ('email address'),
         unique=True,
@@ -68,6 +79,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     follower_count = models.IntegerField(default=0, blank=True, null=True)
     datecreated = models.DateTimeField(auto_now_add=True)
 
+    account_type = models.CharField(
+        max_length=10,
+        choices=ACCOUNTTYPE_CHOICES,
+        default=PUBLIC,
+    )
+  
+    
     objects = UserManager()
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
