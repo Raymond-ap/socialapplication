@@ -1,17 +1,13 @@
 from django.contrib import admin
-
-from django.contrib import admin
 from .models import *
 
-@admin.register(User)
-class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email', 'following_count', 'follower_count')
+
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     list_display = ('user', 'post_text', 'created_at')
 
-@admin.register(PostInteractionType)
+@admin.register(PostInteraction)
 class PostInteractionTypeAdmin(admin.ModelAdmin):
     list_display = ('interaction_type', 'post', 'user')
 

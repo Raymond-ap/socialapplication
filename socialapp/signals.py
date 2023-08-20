@@ -7,34 +7,50 @@ from .models import *
 
 @receiver(post_save, sender=Follow)
 def update_follower_following_count(sender, instance, **kwargs):
-    follower_count = instance.follower.follower_count
-    following_count = instance.following.following_count
+    
 
     user1 = User.objects.get(id=instance.follower.id)
     user2= User.objects.get(id=instance.following.id)
 
-    print("follower_count", follower_count, "following_count", following_count)
-
+   
+    follower_following_count = user1.following_count
+    following_follower_count = user2.follower_count
+   
     if user1:
-        instance.follower.following_count = following_count + 1
+        instance.follower.following_count = follower_following_count + 1
         instance.follower.save()
 
     if user2:
-        instance.following.follower_count = follower_count + 1
+        instance.following.follower_count = following_follower_count + 1
         instance.following.save()
+    
 
 
-@receiver(post_save, sender=PostInteractionType)
+
+@receiver(post_delete, sender=Follow)
+def update_follower_following_count_on_delete(sender, instance, **kwargs):
+    user1 = instance.follower
+    user2 = instance.following
+
+    if user1:
+        user1.following_count = user1.following_count - 1
+        user1.save()
+
+    if user2:
+        user2.follower_count = user2.follower_count - 1
+        user2.save()
+
+
+
+@receiver(post_save, sender=PostInteraction)
 def update_post_interaction(sender, instance, created, **kwargs):
     if created:
         post = instance.post
         interaction_type = instance.interaction_type
 
-        if interaction_type == PostInteractionType.COMMENT and instance.interaction_text:
-            # If it's a comment interaction, update interaction text and count
+        if interaction_type == PostInteraction.COMMENT and instance.interaction_text:
             post.interaction_count += 1
             post.save()
-        elif interaction_type == PostInteractionType.LIKE:
-            # If it's a like interaction, update interaction count
+        elif interaction_type == PostInteraction.LIKE:
             post.interaction_count += 1
             post.save()

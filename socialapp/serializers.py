@@ -30,7 +30,7 @@ class PostInteractionTypeSerializer(serializers.ModelSerializer):
     user = UserSerializer()
 
     class Meta:
-        model = PostInteractionType
+        model = PostInteraction
         fields = '__all__'
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -50,8 +50,6 @@ class LikeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class FollowSerializer(serializers.ModelSerializer):
-    follower = UserSerializer()
-    following = UserSerializer()
 
     class Meta:
         model = Follow
@@ -92,4 +90,3 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = '__all__'
-
