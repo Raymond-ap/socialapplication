@@ -145,3 +145,15 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class PostShare(models.Model):
+    shared_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    original_post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='shared_posts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.shared_by} shared {self.original_post}"
+
+    class Meta:
+        unique_together = ('shared_by', 'original_post')

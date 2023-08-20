@@ -40,5 +40,8 @@ urlpatterns = [
          create_comment_reply, name='create_comment_reply'),
     path('comments/<int:comment_id>/replies/<int:reply_id>',
          delete_comment_reply, name='delete_comment_reply'),
+    path('shared-posts', get_shared_posts, name='get_shared_posts'),
+    path('shared-posts/<int:post_share_id>', delete_shared_post, name='delete_shared_post'),
+         
     path('', include(router.urls))
 ]

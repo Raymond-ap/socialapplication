@@ -367,7 +367,6 @@ def delete_comment(request, comment_id):
         return Response({'error': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_comment_reply(request, comment_id):
@@ -412,9 +411,36 @@ def delete_comment_reply(request, comment_id, reply_id):
         return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
 
     try:
-        reply = CommentReply.objects.get(id=reply_id, comment=comment, user=request.user)
+        reply = CommentReply.objects.get(
+            id=reply_id, comment=comment, user=request.user)
     except CommentReply.DoesNotExist:
         return Response({'error': 'Reply not found'}, status=status.HTTP_404_NOT_FOUND)
 
     reply.delete()
     return Response({'message': 'Reply deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_shared_posts(request):
+    user = request.user
+    shared_posts = PostShare.objects.filter(shared_by=user)
+    post_ids = shared_posts.values_list('original_post', flat=True)
+    posts = Post.objects.filter(id__in=post_ids)
+
+    serializer = PostSerializer(posts, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_shared_post(request, post_share_id):
+    try:
+        shared_post = PostShare.objects.get(id=post_share_id)
+        if shared_post.shared_by != request.user:
+            return Response({'error': 'You are not authorized to delete this shared post.'}, status=status.HTTP_403_FORBIDDEN)
+
+        shared_post.delete()
+        return Response({'message': 'Shared post deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+    except PostShare.DoesNotExist:
+        return Response({'error': 'Shared post not found.'}, status=status.HTTP_404_NOT_FOUND)

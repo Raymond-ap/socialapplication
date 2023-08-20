@@ -94,3 +94,16 @@ def update_post_interaction_on_reply_delete(sender, instance, **kwargs):
     post = instance.comment.post
     post.interaction_count -= 1
     post.save()
+
+
+@receiver(post_save, sender=PostShare)
+def update_shared_post_interaction(sender, instance, created, **kwargs):
+    if created:
+        instance.original_post.interaction_count += 1
+        instance.original_post.save()
+
+
+@receiver(post_delete, sender=PostShare)
+def reduce_shared_post_interaction(sender, instance, **kwargs):
+    instance.original_post.interaction_count -= 1
+    instance.original_post.save()
