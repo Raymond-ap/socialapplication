@@ -11,10 +11,24 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from .serializer import *
 from rest_framework.decorators import api_view, renderer_classes, permission_classes, authentication_classes,throttle_classes
+from rest_framework.decorators import action
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
 
 # Create your views here.
 class RegisterView(APIView):
+    @swagger_auto_schema(
+        request_body=UserSerializer,
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
     def post(self, request):
+        
         payload = request.data
         hashed_password = make_password(
             payload['password'])  # Hash the password
@@ -37,6 +51,16 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    @swagger_auto_schema(
+        request_body=LoginSerializer,
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -67,30 +91,72 @@ class LoginView(APIView):
     
 
 
-@api_view(['POST'])
-@permission_classes((permissions.IsAuthenticated,))
-def update_profile(request):
-    try:
-        user = request.user
-        userobj = User.objects.get(id=user.id)
-
-        # Exclude email and username fields
-        excluded_fields = ['email', 'username']
-
-        # Create a dictionary for the fields to update
-        payload = {field: value for field, value in request.data.items() if field not in excluded_fields}
-
-        ser = UserSerializer(userobj, data=payload, partial=True)
-        ser.is_valid(raise_exception=True)
-        ser.save()
-
     
-        data = {
-            'user': ser.data,
-            'message': 'Updated profile successfully'
-        }
 
-        return Response(data, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UpdateProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+  
+
+    @swagger_auto_schema(
+        request_body=ProfileSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def post(self, request):
+        try:
+            user = request.user
+            userobj = User.objects.get(id=user.id)
+
+            # Exclude email and username fields
+            excluded_fields = ['email', 'username']
+
+            # Create a dictionary for the fields to update
+            payload = {field: value for field, value in request.data.items() if field not in excluded_fields}
+
+            ser = ProfileSerializer(userobj, data=payload, partial=True)
+            ser.is_valid(raise_exception=True)
+            ser.save()
+
+            data = {
+                'user': ser.data,
+                'message': 'Updated profile successfully'
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+
+class GetProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+  
+    @swagger_auto_schema(
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def get(self, request):
+        try:
+            user = request.user
+            userobj = User.objects.get(id=user.id)
+            ser = UserSerializer(userobj)
+            
+            data = {
+                'user': ser.data
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

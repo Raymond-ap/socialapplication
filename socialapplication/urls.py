@@ -27,12 +27,10 @@ schema_view = get_schema_view(
         title="Social app",
         default_version='v1',
         description="Social app backend",
-        terms_of_service="https://www.yourapp.com/terms/",
-        contact=openapi.Contact(email=""),
-        license=openapi.License(name="Your License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    
 )
 
 
@@ -40,7 +38,7 @@ urlpatterns = [
     path('api/v1/', include("socialapp.urls")),
     path('api/v1/', include("authentication.urls")),
     path('admin/', admin.site.urls),
-     path('swagger/<format>/', schema_view.without_ui(cache_timeout=0),
+    path('swagger/<format>/', schema_view.without_ui(cache_timeout=0),
          name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger',
          cache_timeout=0), name='schema-swagger-ui'),

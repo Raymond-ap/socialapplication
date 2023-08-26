@@ -30,6 +30,18 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+SWAGGER_SETTINGS = {
+   'SECURITY_DEFINITIONS': {
+     
+      'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+      }
+   }
+}
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -43,6 +55,7 @@ INSTALLED_APPS = [
     'authentication',
     'rest_framework',
     'drf_yasg',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
