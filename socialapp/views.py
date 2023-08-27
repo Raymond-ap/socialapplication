@@ -21,18 +21,14 @@ from django.db.models import Subquery
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets
-
-
-class FollowView(APIView):
-    # Ensure only authenticated users can follow
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        # Get the ID of the user to follow
-        following_id = request.data.get('following_id')
-from django.db.models import Q,Count
-from datetime import timedelta
+from django.db.models import Q
 from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Count
+
+
+
+
 
 
 
@@ -41,7 +37,18 @@ from django.utils import timezone
 class FollowView(APIView):
     permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
 
+    @swagger_auto_schema(
+        request_body=FollowsSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
     def post(self, request):
+     
         following_id = request.data.get('following_id')  # Get the ID of the user to follow
         follower_id = request.user.id  # Get the ID of the authenticated user as the follower
 
@@ -50,6 +57,7 @@ class FollowView(APIView):
             return Response({'error': 'You already follow this user.'}, status=status.HTTP_400_BAD_REQUEST)
 
         data = {'follower': follower_id, 'following': following_id}
+      
         serializer = FollowSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -57,12 +65,22 @@ class FollowView(APIView):
 
 
 
-@api_view(['DELETE'])
-@permission_classes((permissions.IsAuthenticated,))
-def unfollow(request):
-    try:
-        user = request.user
-        follower_id = user.id
+
+class UnfollowView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
+
+    @swagger_auto_schema(
+        request_body=FollowsSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
+    def post(self, request):
+        follower_id = request.user.id
         following_id = request.data.get('following_id')  # Get the ID of the user to unfollow
 
         # Check if the follow relationship exists
@@ -79,47 +97,62 @@ def unfollow(request):
             }
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
-@permission_classes((permissions.IsAuthenticated,))
-def list_followers_following(request):
-    try:
-        user = User.objects.get(id=request.user.id)
-        # Get the query parameter 'action'
-        action = request.query_params.get('action')
 
-        if action == 'followers':
-            # Retrieve the followers using the related name
-            relationships = user.followers_set.all()
-            data_key = 'followers'
-        elif action == 'following':
-            # Retrieve the following using the related name
-            relationships = user.following_set.all()
-        action = request.query_params.get('action')  # Get the query parameter 'action'
+    
 
-        if action == 'followers':
-            relationships = user.followers_set.all()  # Retrieve the followers using the related name
-            data_key = 'followers'
-        elif action == 'following':
-            relationships = user.following_set.all()  # Retrieve the following using the related name
-            data_key = 'following'
-        else:
-            return Response({'error': 'Invalid action parameter'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_list = [{'id': relationship.following.id, 'username': relationship.following.username, 'firstname': relationship.following.firstname,
-                      'lastname': relationship.following.lastname, 'profile_url': relationship.following.profile_url}for relationship in relationships]
-        user_list = [{'id': relationship.following.id, 'username': relationship.following.username,'firstname':relationship.following.firstname,'lastname':relationship.following.lastname,'profile_url':relationship.following.profile_url}for relationship in relationships]
 
-        data = {
-            data_key: user_list
-        }
-        return Response(data, status=status.HTTP_200_OK)
+#implemented the twitter followership style
+class ListFollowersFollowing(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    @swagger_auto_schema(
+    manual_parameters=[
+        openapi.Parameter(
+            name='action',
+            in_=openapi.IN_QUERY,
+            type=openapi.TYPE_STRING,
+            description='Action parameter (\'followers\' or \'following\')',
+        )
+    ],
+    responses={
+        200: 'Successful response',
+        400: 'Bad request',
+        401: 'Unauthorized',
+        404: 'User not found',
+        # Add other response codes and descriptions as needed
+    }
+)
 
-    except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    def post(self, request):
+        try:
+            user = User.objects.get(id=request.user.id)
+            action = request.query_params.get('action')
+
+            if action == 'followers':
+                relationships = user.followers_set.all()
+                data_key = 'followers'
+            elif action == 'following':
+                relationships = user.following_set.all()
+                data_key = 'following'
+            else:
+                return Response({'error': 'Invalid action parameter'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user_list = [{'id': relationship.following.id, 'username': relationship.following.username, 'firstname': relationship.following.firstname,
+                          'lastname': relationship.following.lastname, 'profile_url': relationship.following.profile_url}for relationship in relationships]
+
+            data = {
+                data_key: user_list
+            }
+            return Response(data, status=status.HTTP_200_OK)
+
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
 
 
 @api_view(['GET'])
@@ -136,183 +169,283 @@ def group_details(request):
     
 
 
-@api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-def group_details(request):
-    group_id = request.query_params.get('group_id') 
-    try:
-        group = Group.objects.get(id=group_id)
+class GroupDetailsView(APIView):
+    
+    @swagger_auto_schema(
+    manual_parameters=[
+        openapi.Parameter(
+            name='group_id',
+            in_=openapi.IN_QUERY,
+            type=openapi.TYPE_STRING,
+            description='Group id',
+        )
+    ],
+    responses={
+        200: 'Successful response',
+        400: 'Bad request',
+        401: 'Unauthorized',
+        404: 'User not found',
+        # Add other response codes and descriptions as needed
+    }
+)
+    def get(self,request):
+        group_id = request.query_params.get('group_id') 
+        try:
+            group = Group.objects.get(id=group_id)
+            
+            # Serialize the group details
+            group_serializer = GroupSerializer(group)
+
+            # Get the users belonging to the group
+            group_users = group.groupmembership_set.all()
+            group_users_serializer = GroupMembershipSerializer(group_users, many=True)
+
+            # Combine the group details and group users data
+            response_data = {
+                'group': group_serializer.data,
+                'group_users': group_users_serializer.data
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
         
-        # Serialize the group details
-        group_serializer = GroupSerializer(group)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Get the users belonging to the group
-        group_users = group.groupmembership_set.all()
-        group_users_serializer = GroupMembershipSerializer(group_users, many=True)
 
-        # Combine the group details and group users data
-        response_data = {
-            'group': group_serializer.data,
-            'group_users': group_users_serializer.data
+
+class GroupCreateView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
+
+    @swagger_auto_schema(
+        request_body=CreateGroupSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
         }
+    )
 
-        return Response(response_data, status=status.HTTP_200_OK)
-    
-    except Group.DoesNotExist:
-        return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    
-   
-
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_group(request):
-    payload = request.data
-    payload=request.data
-    payload.update({
-        'owner':request.user.id
-    })
-    serializer = GroupSerializer(data=payload)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def join_group(request):
-    group_id = request.data.get('group_id')
-    user = request.user
-
-    try:
-        group = Group.objects.get(id=group_id)
-    except Group.DoesNotExist:
-        return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-    if GroupMembership.objects.filter(group=group, user=user).exists():
-        return Response({'error': 'You are already a member of this group'}, status=status.HTTP_400_BAD_REQUEST)
-
-    membership, created = GroupMembership.objects.get_or_create(group=group, user=user)
-
-    if created:
-        group.group_users_count += 1
-        group.save()
-    
-
-    return Response({'message': 'Joined the group'}, status=status.HTTP_200_OK)
+    def post(self,request):
+        payload = request.data
+        payload=request.data
+        payload.update({
+            'owner':request.user.id
+        })
+        serializer = GroupSerializer(data=payload)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def leave_group(request):
-    group_id = request.data.get('group_id')
-    user = request.user
+class JoinGroupView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
 
-    try:
-        group = Group.objects.get(id=group_id)
-    except Group.DoesNotExist:
-        return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+    @swagger_auto_schema(
+        request_body=JoinLeaveGroupSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
 
-    try:
-        membership = GroupMembership.objects.get(group=group, user=user)
-        membership.delete()
 
-        if group.group_count > 0:
-            group.group_count -= 1
-        if group.group_users_count > 0:
-            group.group_users_count -= 1
+    def post(self,request):
+        group_id = request.data.get('group_id')
+        user = request.user
+
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+        if GroupMembership.objects.filter(group=group, user=user).exists():
+            return Response({'error': 'You are already a member of this group'}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership, created = GroupMembership.objects.get_or_create(group=group, user=user)
+
+        if created:
+            group.group_users_count += 1
             group.save()
+        
 
-        return Response({'message': 'Left the group'}, status=status.HTTP_200_OK)
-    except GroupMembership.DoesNotExist:
-        return Response({'error': 'You are not a member of this group'}, status=status.HTTP_400_BAD_REQUEST)
-
+        return Response({'message': 'Joined the group'}, status=status.HTTP_200_OK)
 
 
 
 
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def edit_delete_group(request, group_id):
-    try:
-        group = Group.objects.get(id=group_id)
-    except Group.DoesNotExist:
-        return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Check if the requesting user is the owner of the group
-    if group.owner != request.user:
-        return Response({'error': 'You are not the owner of this group.'}, status=status.HTTP_403_FORBIDDEN)
+class LeaveGroupView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
 
-    if request.method == 'PUT':
+    @swagger_auto_schema(
+        request_body=JoinLeaveGroupSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
+    def post(self,request):
+        group_id = request.data.get('group_id')
+        user = request.user
+
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            membership = GroupMembership.objects.get(group=group, user=user)
+            membership.delete()
+
+           
+            if group.group_users_count > 0:
+                group.group_users_count -= 1
+                group.save()
+
+            return Response({'message': 'Left the group'}, status=status.HTTP_200_OK)
+        except GroupMembership.DoesNotExist:
+            return Response({'error': 'You are not a member of this group'}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+
+
+
+
+
+class EditDeleteGroupView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        request_body=CreateGroupSerializer,  # Use the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            403: 'Forbidden',
+            404: 'Group not found',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def put(self, request, group_id):
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if group.owner != request.user:
+            return Response({'error': 'You are not the owner of this group.'}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = GroupSerializer(group, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    elif request.method == 'DELETE':
+    @swagger_auto_schema(
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            403: 'Forbidden',
+            404: 'Group not found',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def delete(self, request, group_id):
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if group.owner != request.user:
+            return Response({'error': 'You are not the owner of this group.'}, status=status.HTTP_403_FORBIDDEN)
+
         group.delete()
-        return Response({'message': 'Group deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'message': 'Group deleted successfully'}, status=status.HTTP_200_OK)
+    
 
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def search(request):
-    query = request.query_params.get('query', '')
 
-    # Search users, posts, and groups using Q objects
-    public_users = User.objects.filter(
-    Q(username__icontains=query) | Q(firstname__icontains=query) | Q(lastname__icontains=query),
-    account_type='public'
-    )
 
-    # Filter private users who are followed by request.user
-    private_users_followed = User.objects.filter(
-        Q(username__icontains=query) | Q(firstname__icontains=query) | Q(lastname__icontains=query),
-        account_type='private',
-        followers_set__follower=request.user  # Assuming 'followers_set' is the related name
-    )
-
-    # Combine the two querysets
-    users = public_users | private_users_followed
-
-    # Get posts matching the search query with audience type 'public'
-    public_posts = Post.objects.filter(
-        Q(post_text__icontains=query),
-        audience_type=Post.PUBLIC
-    )
-
-    # Get private posts by users followed by request.user
-    private_posts_visible = Post.objects.filter(
-        Q(post_text__icontains=query),
-        audience_type=Post.PRIVATE,
-        user__in=request.user.following_set.values('following')
-    )
-    # Combine the two querysets
-    posts = public_posts | private_posts_visible
-
-    groups = Group.objects.filter(Q(group_name__icontains=query) | Q(group_description__icontains=query))
-
-    # Serialize the search results
-    user_serializer = UserSerializer(users, many=True)
-    post_serializer = PostSerializer(posts, many=True)
-    group_serializer = GroupSerializer(groups, many=True)
-
-    response_data = {
-        'users': user_serializer.data,
-        'posts': post_serializer.data,
-        'groups': group_serializer.data
+class SearchApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    @swagger_auto_schema(
+    manual_parameters=[
+        openapi.Parameter(
+            name='query',
+            in_=openapi.IN_QUERY,
+            type=openapi.TYPE_STRING,
+            description='Search query',
+        )
+    ],
+    responses={
+        200: 'Successful response',
+        400: 'Bad request',
+        401: 'Unauthorized',
+        404: 'User not found',
+        # Add other response codes and descriptions as needed
     }
+)
 
-    return Response(response_data, status=status.HTTP_200_OK)
+    def get(self,request):
+        query = request.query_params.get('query', '')
+
+        # Search users, posts, and groups using Q objects
+        public_users = User.objects.filter(
+        Q(username__icontains=query) | Q(firstname__icontains=query) | Q(lastname__icontains=query),
+        account_type='public'
+        )
+
+        # Filter private users who are followed by request.user
+        private_users_followed = User.objects.filter(
+            Q(username__icontains=query) | Q(firstname__icontains=query) | Q(lastname__icontains=query),
+            account_type='private',
+            followers_set__follower=request.user  # Assuming 'followers_set' is the related name
+        )
+
+        # Combine the two querysets
+        users = public_users | private_users_followed
+
+        # Get posts matching the search query with audience type 'public'
+        public_posts = Post.objects.filter(
+            Q(post_text__icontains=query),
+            audience_type=Post.PUBLIC
+        )
+
+        # Get private posts by users followed by request.user
+        private_posts_visible = Post.objects.filter(
+            Q(post_text__icontains=query),
+            audience_type=Post.PRIVATE,
+            user__in=request.user.following_set.values('following')
+        )
+        # Combine the two querysets
+        posts = public_posts | private_posts_visible
+
+        groups = Group.objects.filter(Q(group_name__icontains=query) | Q(group_description__icontains=query))
+
+        # Serialize the search results
+        user_serializer = UserSerializer(users, many=True)
+        post_serializer = PostSerializer(posts, many=True)
+        group_serializer = GroupSerializer(groups, many=True)
+
+        response_data = {
+            'users': user_serializer.data,
+            'posts': post_serializer.data,
+            'groups': group_serializer.data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 
@@ -383,41 +516,65 @@ class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@swagger_auto_schema(
-    method='post',
-    request_body=PostSerializer,
-    responses={
-        status.HTTP_201_CREATED: openapi.Response(description='Post created successfully'),
-        status.HTTP_400_BAD_REQUEST: openapi.Response(description='Bad request'),
-    },
-)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_post(request, *args, **kwargs):
-    serializer = PostSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def edit_post(request, post_id):
-    try:
-        post = Post.objects.get(id=post_id)
-        if post.user != request.user:
-            return Response({'error': 'You are not authorized to edit this post.'}, status=status.HTTP_403_FORBIDDEN)
+class PostCreateView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
 
-        serializer = PostSerializer(post, data=request.data, partial=True)
+    @swagger_auto_schema(
+        request_body=CreatePostSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
+
+    def post(self,request):
+
+        payload=request.data
+        payload.update({
+            'tag':Tag.objects.get(id=request.data['tag_id']).id,
+            'user':request.user.id
+        })
+        serializer = PostSerializer(data=payload)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
+class EditPostView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
+
+    @swagger_auto_schema(
+        request_body=CreatePostSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
+
+    def put(self,request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+            if post.user != request.user:
+                return Response({'error': 'You are not authorized to edit this post.'}, status=status.HTTP_403_FORBIDDEN)
+
+            serializer = PostSerializer(post, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Post.DoesNotExist:
+            return Response({'error': 'Post not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['DELETE'])
@@ -429,7 +586,7 @@ def delete_post(request, post_id,):
             return Response({'error': 'You are not authorized to delete this post.'}, status=status.HTTP_403_FORBIDDEN)
 
         post.delete()
-        return Response({'message': 'Post deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'message': 'Post deleted successfully.'}, status=status.HTTP_200_OK)
     except Post.DoesNotExist:
         return Response({'error': 'Post not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -448,12 +605,32 @@ def get_posts(request):
     private_posts = Post.objects.filter(
         audience_type=Post.PRIVATE, user__in=Subquery(followed_users_ids))
 
-    print("followed_users_ids", followed_users_ids)
+  
     # Combine and serialize the public and private posts
     posts = public_posts.union(private_posts)
-    serializer = PostSerializer(posts, many=True)
+    serialized_posts = []
+    for post in posts:
+        post_data = {
+            "id": post.id,
+            "created_by": {
+                "id": post.user.id,
+                "username": post.user.username,
+                "email": post.user.email,
+                # Include other user details as needed
+            },
+            "tag": post.tag.id,
+            "post_text": post.post_text,
+            "post_image_url": post.post_image_url,
+            "post_video_url": post.post_video_url,
+            "interaction_count": post.interaction_count,
+            "audience_type": post.audience_type,
+            "created_at": post.created_at,
+            "updated_at": post.updated_at,
+        }
+        serialized_posts.append(post_data)
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+
+    return Response(serialized_posts, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -475,8 +652,7 @@ def like_unlike_post(request, post_id, *args, **kwargs):
     except Like.DoesNotExist:
         # User has not liked the post, so create a new like
         like = Like.objects.create(post=post, user=user)
-        serializer = LikeSerializer(like)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response({'message': 'Post liked'}, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -488,24 +664,50 @@ def get_comments_for_post(request, post_id):
         return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
     comments = Comment.objects.filter(post=post)
-    serializer = CommentSerializer(comments, many=True)
+    
+    post_serializer = PostSerializer(post)  # Serialize the post separately
+    comment_serializer = CommentSerializer(comments, many=True)  # Serialize the comments
+    
+    response_data = {
+        'post': post_serializer.data,  # Include serialized post data
+        'comments': comment_serializer.data,  # Include serialized comment data
+    }
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_comment(request, post_id):
-    try:
-        post = Post.objects.get(id=post_id)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = CommentSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(user=request.user, post=post)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class CreatePostCommentView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can follow
+
+    @swagger_auto_schema(
+        request_body=PostCommentSerializer,  # Provide the appropriate serializer class
+        responses={
+            200: 'Successful response',
+            400: 'Bad request',
+            401: 'Unauthorized',
+            # Add other response codes and descriptions as needed
+        }
+    )
+
+
+    def post(self,request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        payload=request.data
+        payload.update({
+            'post':post.id,
+            'user':request.user.id
+        })
+
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['DELETE'])
@@ -517,7 +719,7 @@ def delete_comment(request, comment_id):
             return Response({'error': 'You are not authorized to delete this comment.'}, status=status.HTTP_403_FORBIDDEN)
 
         comment.delete()
-        return Response({'message': 'Comment deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'message': 'Comment deleted successfully.'}, status=status.HTTP_200_OK)
     except Comment.DoesNotExist:
         return Response({'error': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -587,6 +789,40 @@ def get_shared_posts(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
+
+class CreateSharedPostView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        request_body=CreatePostShareSerializer,
+        responses={
+            201: 'Shared post created',
+            400: 'Bad request',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def post(self, request):
+        payload=request.data
+        payload.update({
+            'shared_by':request.user.id
+        })
+
+        print(payload)
+        serializer = PostShareSerializer(data=payload)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
 @api_view(['DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 def delete_shared_post(request, post_share_id):
@@ -596,6 +832,39 @@ def delete_shared_post(request, post_share_id):
             return Response({'error': 'You are not authorized to delete this shared post.'}, status=status.HTTP_403_FORBIDDEN)
 
         shared_post.delete()
-        return Response({'message': 'Shared post deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'message': 'Shared post deleted successfully.'}, status=status.HTTP_200_OK)
     except PostShare.DoesNotExist:
         return Response({'error': 'Shared post not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+
+
+
+class CreateCommentReplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        request_body=CreateCommentReplySerializer,
+        responses={
+            201: 'Comment reply created',
+            400: 'Bad request',
+            # Add other response codes and descriptions as needed
+        }
+    )
+    def post(self, request, comment_id):
+        try:
+            comment = Comment.objects.get(id=comment_id)
+        except Comment.DoesNotExist:
+            return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        payload=request.data
+        payload.update({
+            "user":request.user.id,
+            'comment':comment.id
+
+        })
+
+        serializer = CommentReplySerializer(data=payload)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
